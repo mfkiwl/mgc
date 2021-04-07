@@ -2,25 +2,17 @@
 % Please edit documentation in R/discrStat.R
 \name{discr.mnr}
 \alias{discr.mnr}
-\title{Mean Normalized Rank}
+\title{Discriminability Mean Normalized Rank}
 \usage{
-discr.mnr(rdf, remove_outliers = TRUE, thresh = 0, output = FALSE)
+discr.mnr(rdf)
 }
 \arguments{
-\item{rdf}{[n]: the reliability density function.}
-
-\item{remove_outliers=TRUE}{boolean indicating whether to ignore subjects with rdf below a certain cutoff.}
-
-\item{thresh=0}{[1]: the threshold below which to ignore subjects.}
-
-\item{output=FALSE}{a boolean indicating whether to ignore output.}
+\item{rdf}{the reliability densities.}
 }
 \value{
-discr [1]: the discriminability statistic.
+the mnr.
 }
 \description{
-A function for computing the mnr from an rdf.
+Discriminability Mean Normalized Rank
 }
-\author{
-Eric Bridgeford and Gregory Kiar
-}
+\keyword{internal}

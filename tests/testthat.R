@@ -1,4 +1,4 @@
 library(testthat)
-library(discriminability)
+library(mgc)
 
-test_check("discriminability")
+test_check("mgc")

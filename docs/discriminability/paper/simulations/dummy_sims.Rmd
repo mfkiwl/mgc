@@ -1,0 +1,206 @@
+---
+title: "Dummy Sims"
+author: "Eric Bridgeford"
+date: "June 19, 2020"
+output: html_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+require(ggplot2)
+require(reshape2)
+require(grid)
+require(gridExtra)
+require(mgc)
+require(ICC)
+require(I2C2)
+require(cowplot)
+require(scales)
+require(latex2exp)
+require(MASS)
+source('./shared_scripts.R')
+require(dplyr)
+```
+
+
+```{r}
+n = 10
+
+data <- lapply(c("(i) Discriminable", "(ii) Offset", "(iii) Outlier"), function (sim) {
+  X.d <- matrix(NaN, nrow=n*2, ncol=1)
+  if (sim == "(ii) Offset") {
+    centers <- seq(-1, 1, length.out=n)
+    ids <- 1:n
+    dist <- 2/n
+    X.d[,1] <- c(centers + dist, centers - dist)
+    Y <- c(ids, ids)
+    Z <- c(rep(1, n), rep(2, n))
+  }
+  else if (sim == "(iii) Outlier") {
+    centers <- seq(-1, 1, length.out=n)
+    ids <- 1:n
+    dist <- .5/n
+    X.d[,1] <- c(centers + dist, centers - dist)
+    rpts <- c(3, 17)
+    Y <- c(ids, ids)
+    set.seed(1234)
+    X.d[rpts,1] <- X.d[rpts,1] + 8
+    Z <- c(rep(1, n), rep(2, n))
+  }
+  else if (sim == "(i) Discriminable") {
+    centers <- seq(-1, 1, length.out=n)
+    ids <- 1:n
+    dist <- .5/n
+    X.d[,1] <- c(centers + dist, centers - dist)
+    Z <- c(rep(1, n), rep(2, n))
+    Y <- c(ids, ids)
+  }
+  else if (sim == "(iv) Unreliable") {
+    centers <- rep(0, length.out=n)
+    ids <- 1:n
+    dist <- .5/n
+    X.d[,1] <- c(centers + dist, centers - dist)
+    Z <- c(rep(1, n), rep(2, n))
+    Y <- c(ids, rev(ids))
+  }
+  return(data.frame(X=X.d, Y=Y, Z=Z, Simulation=sim))
+})
+names(data) <- c("(i) Discriminable", "(ii) Offset", "(iii) Outlier")
+```
+
+```{r}
+results <- lapply(names(data), function(sim) {
+  dat <- data[[sim]]
+  icc <- icc.os(dat$X, dat$Y)
+  discr <- discr.os(dat$X, dat$Y, is.dist=FALSE)
+  fpi <- fpi.os(matrix(dat$X, ncol=1), dat$Y, dat$Z, dist.xfm=dist.x, is.sim=FALSE)
+  disco <- disco.os(dat$X, dat$Y, is.dist=FALSE)
+  data.frame(Statistic=c(icc, discr, fpi, disco), Simulation=sim,
+             Algorithm=c("ICC", "Discr.", "Finger.", "Kernel"))
+})
+
+var.ord <- c(sapply(1:10, function(i) rep(i, 2)))
+Dmtx_results <- lapply(names(data), function(sim) {
+  dat <- data[[sim]]
+  new_ord <- sort(dat$Y, index.return=TRUE)$ix
+  Dmtx <- as.matrix(dist(matrix(dat$X[new_ord], ncol=1))) %>%
+    melt() %>%
+    dplyr::rename(Distance=value) %>%
+    dplyr::mutate(Simulation = sim) %>%
+    dplyr::mutate(Individual1=var.ord[Var1], Individual2=var.ord[Var2])
+})
+```
+
+```{r, fig.height=10, fig.width=14}
+col.1 <- do.call(rbind, data) %>%
+  group_by(Simulation) %>%
+  mutate(X=(X - min(X))/(max(X) - min(X))) %>%
+  ungroup() %>%
+  mutate(Simulation=factor(Simulation, 
+                           levels=c("(i) Discriminable", "(ii) Offset", "(iii) Outlier"), ordered=TRUE),
+         Z=factor(Z)) %>%
+  ggplot(aes(x=X - min(X)/max(X), y=as.factor(Y),
+             fill=as.factor(Y), shape=Z)) +
+  geom_point(color='white', shape=21) +
+  #scale_shape_manual(values=c('1'=22, '2'=23), guide=FALSE) +
+  xlab("Value") +
+  ylab("Individual ID") +
+  ggtitle("(A) Simulation") +
+  scale_x_continuous(breaks=c(0, 0.5, 1), labels=c(-1, 0, 1)) +
+  scale_fill_discrete(guide=FALSE) +
+  scale_y_discrete(breaks=c(1, 10), labels=c(1, 10)) +
+  theme_bw(base_size=18) +
+  facet_grid(Simulation~., switch="y")
+
+
+alg.colors <- c("#c70000", "#a65628", "#984ea3", "#ff8c00", "#377eb8", "#4daf4a")
+line.types <- c(1, 1, 1, 1, 1, 1)
+names(alg.colors) <- names(line.types) <- c("Discr.", "ICC", "Finger.", "I2C2", "Kernel", "Bayes Accuracy")
+
+Dmtx.results <- do.call(rbind, Dmtx_results) %>%
+  group_by(Simulation) %>%
+  dplyr::mutate(Distance = (Distance - min(Distance))/(max(Distance) - min(Distance)),
+         Var1=factor(Var1, levels=1:(2*n), ordered=TRUE),
+         Var2=factor(Var2, levels=1:(2*n), ordered=TRUE)) %>%
+  ungroup() %>%
+  dplyr::mutate(Simulation=factor(Simulation, 
+                           levels=c("(i) Discriminable", "(ii) Offset", "(iii) Outlier"), ordered=TRUE))
+
+Dmtx_rank <- Dmtx.results %>%
+  group_by(Simulation, Var2) %>%
+  dplyr::mutate(Rank = rank(Distance))
+
+Dmtx.ranked <- Dmtx_rank %>%
+  left_join(Dmtx_rank %>% 
+              filter(Individual1==Individual2 & Var1 != Var2) %>% 
+              dplyr::rename(RankPair=Rank) %>%
+              dplyr::select(Var2, Simulation, RankPair),
+            by=c("Var2", "Simulation")) %>%
+  filter(Rank <= RankPair & Var1 != Var2) %>%
+  dplyr::mutate(color=factor(ifelse(Rank < RankPair, "Closer", ifelse(Individual1 == Individual2, "Match", "Tie")),
+                             levels=rev(c("Match", "Closer", "Tie")), ordered=TRUE))
+
+rank.col <- c("Closer"="#b35806", "Tie"="blue", "Match"="darkgreen")
+col.2 <- Dmtx.results %>%
+  ggplot(aes(x=Var1, y=Var2, fill=Distance)) +
+    geom_tile() +
+    geom_tile(data=Dmtx.ranked %>% arrange(as.numeric(Rank == RankPair)), aes(x=Var1, y=Var2, color=color), size=.5, alpha=0) +
+    scale_color_manual(values=rank.col, name="") +
+    xlab("Measurement ID") +
+    ylab("Measurement ID") +
+    scale_fill_continuous(low="white", high="purple", breaks=c(0, 1), labels=c("small", "large")) +
+    scale_x_discrete(breaks=c(1, 20), labels=c(1, 20)) +
+    scale_y_discrete(breaks=c(1, 20), labels=c(1, 20)) +#, limits=rev(levels(Dmtx_results$Var2))) +
+    facet_grid(Simulation~.) +
+    theme_bw(base_size=18) +
+    theme(
+      strip.background = element_blank(),
+      strip.text = element_blank()
+    ) +
+    ggtitle("(B) Distance Matrices")
+
+sim.dat <- do.call(rbind, results) %>%
+  mutate(Algorithm=factor(Algorithm, ordered=TRUE, levels=c("Discr.", "Finger.", "ICC", "Kernel"))) %>%
+  ungroup() %>%
+  group_by(Algorithm) %>%
+  mutate(Simulation=factor(Simulation, 
+                           levels=c("(i) Discriminable", "(ii) Offset", "(iii) Outlier"), ordered=TRUE),
+         Statistic=ifelse(pmax(Statistic) > 1, Statistic/(max(Statistic)), Statistic)) %>%
+  ungroup() %>%
+  dplyr::group_by(Simulation) %>%
+  dplyr::mutate(ymin=ifelse(min(Statistic) < 0,
+                     ifelse(min(Statistic) < -.5, -1, -.5), 0),
+         ymax=1) %>%
+  dplyr::group_by(Simulation, Algorithm) %>%
+  dplyr::mutate(position=ifelse(min(Statistic) < 0, Statistic - .13,
+                         ifelse(Statistic > .25, Statistic - .13, Statistic + .13)),
+         textcol=ifelse(min(Statistic) < 0, 'black',
+                         ifelse(Statistic > .25, 'white', 'black'))) %>%
+  ungroup() %>%
+  mutate(textcol=factor(textcol))
+
+col.3 <- sim.dat %>%
+  ggplot(aes(x=Algorithm, y=Statistic, fill=Algorithm), color='black') +
+  geom_col() +
+  scale_fill_manual(values=alg.colors, guide=FALSE) +
+  geom_text(data=sim.dat, aes(label=sprintf("%.2f", Statistic), y=position, color=textcol), size=6) +
+  scale_color_manual(values=c('white'="#ffffff", 'black'="#000000"), guide=FALSE) +
+  xlab(" ") +
+  ylab("Statistic") +
+  ggtitle("(C) Reproducibility Statistic") +
+  theme_bw(base_size=18) +
+  scale_y_continuous(breaks=c(-.5, 0, 1), labels=c(-.5, 0, 1),
+                     minor_breaks=c(-.75, -.25, .25, .5, .75),
+                     expand=c(0, 0)) +
+  facet_grid(Simulation ~., scales="free_y") + 
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    #axis.text.x = element_text(color="#FFFFFF"),
+    #axis.ticks.x = element_line(color="#FFFFFF"),,
+    panel.grid.minor.y = element_line(color = "grey80")
+  ) +
+  geom_blank(aes(y=ymin)) +
+  geom_blank(aes(y=ymax))
+
+grid.arrange(col.1, col.2, col.3, nrow=1, widths=c(.5, .45, .55))
+```

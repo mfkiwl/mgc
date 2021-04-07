@@ -4,19 +4,20 @@
 \alias{discr.rdf}
 \title{Reliability Density Function}
 \usage{
-discr.rdf(D, ids)
+discr.rdf(X, ids)
 }
 \arguments{
-\item{D}{[n, n] a distance matrix for n subjects.}
+\item{X}{\code{[n, n]} a distance matrix for n samples.}
 
-\item{ids}{[n]: a vector containing the subject ids for each subject.}
+\item{ids}{\code{[n]} a vector containing the label ids for each sample.}
 }
 \value{
-rdf [n]: the reliability per subject.
+\code{[n]} vector of the reliability per sample.
 }
 \description{
 A function for computing the reliability density function of a dataset.
 }
 \author{
-Shangsi Wang, Eric Bridgeford and Gregory Kiar
+Eric Bridgeford
 }
+\keyword{internal}

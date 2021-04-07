@@ -7,11 +7,11 @@
 Thresholding(localCorr, m, n, sz)
 }
 \arguments{
-\item{localCorr}{is all local correlations;}
+\item{localCorr}{is all local correlations}
 
-\item{m}{is the number of rows of localCorr;}
+\item{m}{is the number of rows of localCorr}
 
-\item{n}{is the number of columns of localCorr;}
+\item{n}{is the number of columns of localCorr}
 
 \item{sz}{is the sample size of original data (which may not equal m or n in case of repeating data).}
 }
@@ -22,5 +22,6 @@ R is a binary matrix of size m and n, with 1's indicating the significant region
 An auxiliary function that finds a region of significance in the local correlation map by thresholding.
 }
 \author{
-C. Shen
+Eric Bridgeford and C. Shen
 }
+\keyword{internal}

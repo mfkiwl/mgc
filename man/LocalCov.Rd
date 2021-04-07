@@ -7,11 +7,11 @@
 LocalCov(A, B, RX, RY)
 }
 \arguments{
-\item{A}{is a properly transformed distance matrix;}
+\item{A}{is a properly transformed distance matrix}
 
-\item{B}{is the second distance matrix properly transformed;}
+\item{B}{is the second distance matrix properly transformed}
 
-\item{RX}{is the column-ranking matrix of A;}
+\item{RX}{is the column-ranking matrix of A}
 
 \item{RY}{is the column-ranking matrix of B.}
 }
@@ -21,3 +21,4 @@ covXY is all local covariances computed iteratively.
 \description{
 An auxiliary function that computes all local correlations simultaneously in O(n^2).
 }
+\keyword{internal}
